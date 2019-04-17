@@ -49,32 +49,40 @@ List<Widget> parse(String originHtmlString) {
   int keyNodeCount = 0;
   preorderTraversalNTree(document.body, f: (dom.Node childNode) {
     if (childNode is dom.Element && truncateTagList.indexOf(childNode.localName) != -1) {
-      // print('TEST: 第 ${keyNodeCount + 1} 个关键节点：');
-      // checkNodeType(childNode);
+      print('TEST: 第 ${keyNodeCount + 1} 个关键节点：');
+      checkNodeType(childNode);
+      keyNodeCount++;
+    // NOTE: 对于占据整行的图片也作为关键节点处理
+    } else if (childNode is dom.Element && childNode.localName == 'img' && checkImageNeedNewLine(childNode)) {
+      print('TEST: 第 ${keyNodeCount + 1} 个关键节点：');
+      checkNodeType(childNode);
       keyNodeCount++;
     }
   });
 
-  // print('TEST: 共 $keyNodeCount 个关键节点');
+  print('TEST: 共 $keyNodeCount 个关键节点');
 
   List<dom.Node> splitNodeList = new List<dom.Node>();
 
   // NOTE: 关键路径作为边界（无边界不剪枝）
   // DEBUG: 使用 continue 会崩溃，原因未知
   for (int index = -1; index < keyNodeCount; ++index) {
-    // print('TEST: index = $index');
+    print('TEST: 迭代下标 index = $index');
     
     // NOTE: szO 深拷贝 Osz
     dom.Node cloneNode = document.body.clone(true); 
 
     // NOTE: 先序遍历找到所有关键节点（由于是引用传值，所以需要重新获取一遍 hashCode）
     List<dom.Node> keyNodeList = new List<dom.Node>();
+    int nodeIndex = 0;
     preorderTraversalNTree(cloneNode, f: (dom.Node childNode) {
       if (childNode is dom.Element && truncateTagList.indexOf(childNode.localName) != -1) {
+        print('TEST: truncate tag nodeIndex = ${nodeIndex++}');
         keyNodeList.add(childNode);
-      // // NOTE: 对于占据整行的图片也作为关键节点处理
-      // } else if (childNode is dom.Element && checkImageNeedNewLine(childNode.attributes['width'], childNode.attributes['height'])) {
-
+      // NOTE: 对于占据整行的图片也作为关键节点处理
+      } else if (childNode is dom.Element && childNode.localName == 'img' && checkImageNeedNewLine(childNode)) {
+        print('TEST: one line image nodeIndex = ${nodeIndex++}');
+        keyNodeList.add(childNode);
       }
     });
 
@@ -183,20 +191,20 @@ List<Widget> parse(String originHtmlString) {
       isCoincide = false;
     }
 
-    // // print('TEST: 左关键路径（左边界）：');
-    // keyNodeRouteLeft?.forEach((keyNode) => checkNodeType(keyNode));
+    print('TEST: 左关键路径（左边界）：');
+    keyNodeRouteLeft?.forEach((keyNode) => checkNodeType(keyNode));
     
-    // // print('TEST: 右关键路径（右边界）：');
-    // keyNodeRouteRight?.forEach((keyNode) => checkNodeType(keyNode));
+    print('TEST: 右关键路径（右边界）：');
+    keyNodeRouteRight?.forEach((keyNode) => checkNodeType(keyNode));
     
     if (!isCoincide) {
       // NOTE: 裁剪关键节点
-      // print('TEST: 裁剪关键节点');
+      print('TEST: 裁剪关键节点');
       removeNodeInBreadthFirstTraversalNTree(cloneNode, 0, keyNodeRouteLeft, keyNodeRouteRight);
 
       // NOTE: 保存节点
-      // print('TEST: 保存节点：');
-      // preorderTraversalNTree(cloneNode);
+      print('TEST: 保存节点：');
+      preorderTraversalNTree(cloneNode);
       // NOTE: 不保存空节点（剪枝结果只剩下根节点）
       if (!(cloneNode.hasChildNodes()) && cloneNode is dom.Element && cloneNode.localName == 'body') {
         // print('TEST: 剩余根节点，不保存节点');
@@ -204,35 +212,48 @@ List<Widget> parse(String originHtmlString) {
         splitNodeList.add(cloneNode);
       }
     } else {
-      // print('TEST: 边界重合，不裁剪');
+      print('TEST: 边界重合，不裁剪');
     }
 
     if (!isCoincide) {
       // NOTE: 保存边界
-      // print('TEST: 如果边界内没有关键路径，则保存边界：');
+      print('TEST: 如果边界内没有关键路径，则保存边界：');
       if (keyNodeRouteRight != null) {
         bool hasKeyRouteNode = false;
         preorderTraversalNTree(keyNodeRouteRight.first, f: (dom.Node childNode) {
-          if (childNode.parent.localName != 'body' && childNode is dom.Element && truncateTagList.indexOf(childNode.localName) != -1) {
-            // print('TEST: 含有关键节点');
-            // checkNodeType(childNode);
-            hasKeyRouteNode = true;
+          if (childNode.parent.localName != 'body') {
+            if ((childNode is dom.Element && truncateTagList.indexOf(childNode.localName) != -1) || 
+                (childNode is dom.Element && childNode.localName == 'img' && checkImageNeedNewLine(childNode))) {
+              print('TEST: 含有关键节点');
+              checkNodeType(childNode);
+              hasKeyRouteNode = true;
+            }
+          } else {
+            print('TEST: 父节点为 body');
           }
         });
         if (!hasKeyRouteNode) {
+          print('TEST: 保存边界');
+          checkNodeType(keyNodeRouteRight.first);
           splitNodeList.add(keyNodeRouteRight.first);
+        } else {
+          print('TEST: 边界内含有关键路径');
         }
+      } else {
+        print('TEST: 右边界为空');
       }
     } else {
-      // print('TEST: 不保存边界');
+      print('TEST: 不保存边界');
     }
   }
 
-  // int splitNodeIndex = 0;
-  // for (dom.Node splitNode in splitNodeList) {
-  //   print('TEST: splitNodeIndex = ${splitNodeIndex++}');
-  //   preorderTraversalNTree(splitNode);
-  // }
+  print('TEST: 关键路径解析完毕');
+
+  int splitNodeIndex = 0;
+  for (dom.Node splitNode in splitNodeList) {
+    print('TEST: splitNodeIndex = ${splitNodeIndex++}');
+    preorderTraversalNTree(splitNode);
+  }
 
   List<Widget> widgetList = parseNode2Flutter(splitNodeList);
   return widgetList;
@@ -255,6 +276,7 @@ List<Widget> parseNode2Flutter(List<dom.Node> nodeList) {
     baseLineValue = 14.0;
     // NOTE: 向下合并
     if (node is dom.Element && node.localName == 'video') {
+      // print('TEST: video 节点');
       String sourceUrl = '';
       for (dom.Node videoNode in node.nodes) {
         if (videoNode is dom.Element && videoNode.localName == 'source') {
@@ -267,12 +289,25 @@ List<Widget> parseNode2Flutter(List<dom.Node> nodeList) {
       widgetList.add(new Container(
         width: DeviceAttribute.screenWidth,
         child: new Center(
-          // child: new NetworkVideoPlayer(
-          //   sourceUrl,
-          //   autoPlay: false,
-          // ),
+          // TODO: your video player
+          child: new NetworkVideoPlayer(
+            sourceUrl,
+            autoPlay: false,
+          ),
         ),
       ));
+    } else if (node is dom.Element && node.localName == 'img') {
+      print('TEST: img 节点');
+      if (node.attributes.containsKey('src') && node.attributes['src'] != null) {
+        widgetList.add(new Container(
+          width: DeviceAttribute.screenWidth,
+          child: new Center(
+            child: new CachedNetworkImage(
+              imageUrl: node.attributes['src'],
+            ),
+          ),
+        ));
+      }
     } else {
       List<TextSpan> textSpanList = new List<TextSpan>();
       _parseNode2TextSpanTest(node, textSpanList);
@@ -353,7 +388,10 @@ void _parseNode2TextSpanTest(dom.Node node, List<TextSpan> textSpanList, {Map<St
         effectiveStyle['font-size'] = '10px';
         break;
       case 'img':
-        Map<String, double> imageSize = getImageSize(new SizeAttribute(node.attributes['width'] ?? '100%').imgValue, new SizeAttribute(node.attributes['height'] ?? '100%').imgValue);
+        Map<String, double> imageSize = getImageSize(
+          new SizeAttribute(node.attributes['width'] ?? '100%').imgValue,
+          new SizeAttribute(node.attributes['height'] ?? '100%').imgValue,
+        );
         bool newLine = imageSize['width'] >= DeviceAttribute.screenWidth;
         if (baseLineValue < imageSize['height'] && !newLine) {
           baseLineValue = imageSize['height'];
@@ -488,6 +526,7 @@ String trimStringHtml(String stringToTrim) {
 // NOTE: utility
 typedef TraversalOperation(dom.Node node);
 void checkNodeType(dom.Node node) {
+  print('TEST: checkNodeType');
   if (node is dom.Element) {
     print('TEST: element = ${node.localName}');
   } else if (node is dom.Text) {
@@ -497,13 +536,29 @@ void checkNodeType(dom.Node node) {
   }
 }
 
+// NOTE: 检查图片是否需要占据一行
+bool checkImageNeedNewLine(dom.Node node) {
+  if (node.attributes.containsKey('width') == false) {
+      return true;
+    } else if (node.attributes.containsKey('width')) {
+      String width = node.attributes['width'];
+      SizeAttribute attributeWidth = new SizeAttribute(width ?? '100%');
+      if (attributeWidth.imgValue != null && attributeWidth.imgValue >= DeviceAttribute.screenWidth) {
+        return true;
+      }
+    }
+  return false;
+}
+
 // NOTE: 检查关键路径中的节点的所有子节点是否是子支的第一个/最后一个节点
 bool checkKeyRouteNodes(dom.Node keyRouteNode, List<dom.Node> keyRouteNodeList, bool isFirst) {
   // print('TEST: checkKeyRouteNodes');
   // checkNodeType(keyRouteNode);
   // NOTE: 当被检查的节点是关键节点时，检查完毕
   // NOTE: 关键节点：因为关键路径可能是因为在路径重合时延伸出来的，所以关键节点还得是预设的截断点
-  if (keyRouteNode == keyRouteNodeList.first && keyRouteNode is dom.Element && truncateTagList.contains(keyRouteNode.localName)) {
+  // NOTE: 关键节点：占据整行的图片也视为关键节点
+  if ((keyRouteNode == keyRouteNodeList.first && keyRouteNode is dom.Element && truncateTagList.contains(keyRouteNode.localName)) || 
+      (keyRouteNode is dom.Element && keyRouteNode.localName == 'img' && checkImageNeedNewLine(keyRouteNode))) {
     return true;
   }
   // NOTE: 当被检查的节点不是第一个/最后一个节点
@@ -544,8 +599,8 @@ void breadthFirstTraversalNTree(dom.Node node, {TraversalOperation f = checkNode
 
 // NOTE: 基于广度优先遍历的 N 叉树关键路径剪枝算法（引用传递方式）
 void removeNodeInBreadthFirstTraversalNTree(dom.Node node, int deepLevel, List<dom.Node> keyNodeRouteLeft, List<dom.Node> keyNodeRouteRight) {
-  // print('TEST: 裁剪节点：');
-  // checkNodeType(node);
+  print('TEST: 裁剪节点：');
+  checkNodeType(node);
   
   // NOTE: 跳过叶子节点和关键节点（用关键路径的第一个节点当作关键节点）
   if ((!node.hasChildNodes()) ||
@@ -564,7 +619,7 @@ void removeNodeInBreadthFirstTraversalNTree(dom.Node node, int deepLevel, List<d
       leftBoundary++;
     }
   }
-  // print('TEST: 左边界：$leftBoundary');
+  print('TEST: 左边界：$leftBoundary');
 
   // NOTE: 获取右边界
   int rightBoundary = node.nodes.length;
@@ -575,7 +630,7 @@ void removeNodeInBreadthFirstTraversalNTree(dom.Node node, int deepLevel, List<d
       rightBoundary--;
     }
   }
-  // print('TEST: 右边界：$rightBoundary');
+  print('TEST: 右边界：$rightBoundary');
   
   List<dom.Node> removeNodeList = new List<dom.Node>();
 
