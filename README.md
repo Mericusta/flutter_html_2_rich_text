@@ -441,3 +441,5 @@ typedef OnLinkTap(String url);
 ## 遗留问题
 
 - 文本设置背景颜色会导致部分文本内容与背景色相同而“消失”（Flutter 官方控件 Text.rich 也存在该问题）
+    - 较新 Flutter 版本中该问题已修复
+
