@@ -43,6 +43,10 @@ const List<String> truncateTagList = [
 ];
 
 List<Widget> parse(String originHtmlString) {
+  // NOTE: 去除所有 br 标签用 \n 代替，尽量用富文本相关的东西替换 HTML 的内容，减少 dom 树的裁剪过程
+  originHtmlString = originHtmlString.replaceAll('<br/>', '\n');
+  originHtmlString = originHtmlString.replaceAll('<br />', '\n');
+
   dom.Document document = parser.parse(originHtmlString);
 
   // NOTE: 先序遍历找到所有关键节点的个数
